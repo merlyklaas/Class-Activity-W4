@@ -1,0 +1,122 @@
+---
+title: "w4"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+library(tidyverse)
+library(fs)
+```
+
+
+
+```{r}
+files <- dir_ls(here::here("data", "pfiles_sim"), 
+                glob = "*.csv")
+d <- files %>%
+  map_df(read_csv, .id = "file")
+```
+```{r}
+d <- d %>%
+  mutate(
+    file = str_replace_all(
+      file, 
+      here::here("data", "pfiles_sim"), 
+      ""
+    ),
+    grade = str_replace_all(file, "/g(\\d?\\d).+", "\\1"),
+    grade = as.integer(grade),
+    year = str_replace_all(
+      file, 
+      ".+files(\\d\\d)_sim.+", 
+      "\\1"
+    ),
+    year = as.integer(year),
+    content = str_replace_all(
+      file, 
+      "/g\\d?\\d(.+)pfiles.+", 
+      "\\1"
+    )
+)
+```
+```{r}
+d <- d %>% 
+    select(ssid, grade, year, content, testeventid, 
+           asmtprmrydsbltycd, asmtscndrydsbltycd, Entry:WMLE)
+```
+```{r}
+splt_content <- split(d, d$content)
+str(splt_content)
+```
+```{r}
+m1 <- map(
+  splt_content, 
+  ~lm(Theta ~ asmtprmrydsbltycd, data = .x)
+)
+m2 <- map(
+  splt_content, 
+  ~lm(Theta ~ asmtprmrydsbltycd + asmtscndrydsbltycd, 
+      data = .x)
+)
+m3 <- map(
+  splt_content, 
+  ~lm(Theta ~ asmtprmrydsbltycd * asmtscndrydsbltycd, 
+      data = .x)
+)
+```
+
+```{r}
+by_content <- d %>%
+  group_by(content) %>% 
+  nest()
+by_content
+```
+```{r}
+str(by_content$data)
+```
+```{r}
+map_dbl(by_content$data, nrow)
+map_dbl(by_content$data, ncol)
+map_dbl(by_content$data, ~mean(.x$Theta))
+```
+
+```{r}
+by_content %>%
+    mutate(n = map_dbl(data, nrow))
+```
+```{r}
+by_content %>%
+    mutate(n = map(data, nrow))
+```
+```{r}
+by_content %>%
+    mutate(m1 = map(data, ~lm(Theta ~ primary, data = .x)))
+```
+```{r}
+by_content %>%
+  mutate(
+    m1 = map(data, ~lm(Theta ~ primary, data = .x)),
+    coefs = map(m1, coef)
+)
+```
+
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
